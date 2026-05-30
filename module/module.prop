@@ -1,0 +1,6 @@
+id=seedvault_backup
+name=Seedvault Backup (replaces Google Backup)
+version=16-5.8
+versionCode=16058
+author=magisk-module-seedvault
+description=Installs the Seedvault encrypted backup app as a privileged system app and makes it the active Android backup transport in place of Google Backup. Removing the module restores the previous (Google) backup transport. Requires Android 16 and a reboot after install.
