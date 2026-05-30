@@ -37,6 +37,7 @@ device without rebuilding your ROM.
 | Replace Google Backup with Seedvault | `service.sh` runs `bmgr transport com.stevesoltys.seedvault.transport.ConfigurableBackupTransport` at every boot |
 | Re-enable Google Backup on removal | `uninstall.sh` drops a one-shot script into `/data/adb/service.d` that restores the saved transport |
 | Keep scheduled backups alive | `<allow-in-power-save>` in the sysconfig allowlist + runtime `deviceidle whitelist` / background appops in `service.sh` |
+| Show the backup status/progress notification | `service.sh` grants the runtime `POST_NOTIFICATIONS` permission (Android 13+) so the ongoing progress notification is not silently dropped |
 | Expose WebDAV on non-platform-signed installs | source patch `patches/0001-always-show-storage-chooser.patch` (see [Storage options](#storage-options-incl-webdav)) |
 
 The three permission/allowlist XML files and their install locations mirror
@@ -86,6 +87,20 @@ power-save whitelist (`allow-in-power-save`), and `service.sh` reinforces this a
 each boot (`dumpsys deviceidle whitelist +…`, `appops … RUN_ANY_IN_BACKGROUND
 allow`) to cope with aggressive OEM battery managers (e.g. Motorola). You can
 verify under **Settings → Apps → Seedvault → Battery → Unrestricted**.
+
+### Backup status / progress notification
+
+While a backup runs, Seedvault posts an **ongoing progress notification**. On
+Android 13+ this requires the runtime `POST_NOTIFICATIONS` permission; if it is
+missing the notification is silently dropped (which is why it may not have shown
+before). `service.sh` now grants it explicitly at each boot, so the progress
+notification appears for every backup.
+
+Note it uses a deliberately **silent, low-importance** channel ("Backup
+running"), so it shows in the notification shade without sound or a heads-up
+pop. If you want it louder/more prominent, raise that channel in **Settings →
+Apps → Seedvault → Notifications → Backup running → Importance**. (Android only
+lets the *user* raise a channel's importance after it is created, not the app.)
 
 ---
 
@@ -183,8 +198,9 @@ mocked Android tools:
 - **`tests/test_scripts.sh`** — functional checks: it mocks `bmgr`, `pm`,
   `getprop`, `log`, `dumpsys` and `cmd`, then drives `service.sh` and
   `uninstall.sh` end-to-end to prove that (1) the transport switches to
-  Seedvault, (1b) Seedvault is whitelisted from battery optimization and allowed
-  to run in the background, (2) the previous transport is saved and not clobbered
+  Seedvault, (1b) Seedvault is whitelisted from battery optimization, allowed to
+  run in the background, and granted `POST_NOTIFICATIONS` so its progress
+  notification can show, (2) the previous transport is saved and not clobbered
   on re-run, (3) uninstall drops a restore script targeting the saved transport,
   and (4) that restore script re-enables Google Backup and cleans up after
   itself.

@@ -43,11 +43,14 @@ cat > "$BIN/log" <<'EOF'
 exit 0
 EOF
 
+export PM_GRANT_LOG="$SANDBOX/pm_grants"
 cat > "$BIN/pm" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = "list" ] && [ "$2" = "packages" ]; then
   echo "package:com.android.settings"
   [ -n "${SEEDVAULT_ABSENT:-}" ] || echo "package:com.stevesoltys.seedvault"
+elif [ "$1" = "grant" ]; then
+  echo "$2 $3" >> "${PM_GRANT_LOG:?}"
 fi
 EOF
 
@@ -101,6 +104,7 @@ check "previous transport saved as Google" '[ "$(cat "$STATE_DIR/previous_transp
 echo "== 1b. service.sh exempts Seedvault from battery optimization =="
 check "added to deviceidle (battery optimization) whitelist" 'grep -q "+com.stevesoltys.seedvault" "$SANDBOX/deviceidle_whitelist"'
 check "allowed to run in background (appops)" 'grep -q "com.stevesoltys.seedvault RUN_ANY_IN_BACKGROUND allow" "$SANDBOX/appops_calls"'
+check "POST_NOTIFICATIONS granted (progress notification can show)" 'grep -q "com.stevesoltys.seedvault android.permission.POST_NOTIFICATIONS" "$SANDBOX/pm_grants"'
 
 echo "== 2. re-running service.sh is idempotent (keeps saved previous) =="
 bash "$SANDBOX/scripts/service.sh"

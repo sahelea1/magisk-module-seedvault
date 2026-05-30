@@ -49,6 +49,14 @@ dumpsys deviceidle whitelist +"$SEEDVAULT_PKG" >/dev/null 2>&1
 cmd appops set "$SEEDVAULT_PKG" RUN_ANY_IN_BACKGROUND allow >/dev/null 2>&1
 cmd appops set "$SEEDVAULT_PKG" RUN_IN_BACKGROUND allow >/dev/null 2>&1
 
+# 2c) Make sure the backup status/progress notification can actually show.
+#     On Android 13+ POST_NOTIFICATIONS is a runtime permission; if it is not
+#     granted, Seedvault's ongoing progress notification is silently dropped.
+#     default-permissions pre-grants it, but that is unreliable for Magisk
+#     system apps, so grant it explicitly here (no-op on older Android).
+pm grant "$SEEDVAULT_PKG" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1
+cmd appops set "$SEEDVAULT_PKG" POST_NOTIFICATION allow >/dev/null 2>&1
+
 # 3) Remember the transport that was active BEFORE we switch, exactly once,
 #    so removing the module can restore it.
 if [ ! -f "$PREV_FILE" ]; then
