@@ -1,9 +1,5 @@
 # Build workspace created by scripts/build.sh
 .build/
 
-# Generated flashable zips
-/*.zip
-seedvault-magisk-*.zip
-
 # Gradle/SDK local config that may leak into the source clone
 local.properties
