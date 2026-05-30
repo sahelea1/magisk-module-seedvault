@@ -66,6 +66,11 @@ if [ -f "$APK" ]; then
   if [ -n "$APKSIGNER" ]; then
     check "APK signature verifies" "'$APKSIGNER' verify '$APK' >/dev/null 2>&1"
   fi
+  if [ -n "$AAPT2" ]; then
+    # grep -c reads the whole stream (no SIGPIPE under 'set -o pipefail')
+    WEBDAV_HITS="$("$AAPT2" dump resources "$APK" 2>/dev/null | grep -c 'layout/fragment_webdav_config')"
+    check "APK includes the WebDAV storage backend" "[ '${WEBDAV_HITS:-0}' -gt 0 ]"
+  fi
 else
   echo "  SKIP: APK not built yet (run scripts/build.sh)"
 fi

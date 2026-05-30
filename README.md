@@ -79,6 +79,22 @@ stay ungranted.
 > recovery code). Selecting the transport — which this module does — is the part
 > that normally requires ROM integration.
 
+### Storage options (incl. WebDAV)
+
+When you set up Seedvault, the storage picker offers:
+
+- **WebDAV** — back up to any WebDAV server (Nextcloud, ownCloud, mailbox.org,
+  a self-hosted server, etc.). Pick *WebDAV*, then enter the server **URL**,
+  **username** and **password**. This needs no extra setup from this module:
+  the bundled Seedvault build already ships the WebDAV backend, and the app
+  holds the `INTERNET` / `ACCESS_NETWORK_STATE` permissions it requires.
+- **USB flash drive** — removable storage; Seedvault backs up automatically when
+  it is plugged in.
+- **Internal storage / SD card** and other Storage Access Framework providers
+  (e.g. a DAVx5-mounted share) that expose a documents root.
+
+WebDAV is the recommended option for off-device, network backups.
+
 ### Uninstall
 
 Remove the module in the Magisk app and **reboot**. On that reboot the previous
