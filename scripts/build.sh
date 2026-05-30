@@ -49,6 +49,17 @@ else
   echo ">> Reusing existing clone at $SRC"
 fi
 
+# Apply our patches (idempotently: skip any already applied).
+for p in "$REPO_ROOT"/patches/*.patch; do
+  [ -e "$p" ] || continue
+  if git -C "$SRC" apply --reverse --check "$p" >/dev/null 2>&1; then
+    echo ">> Patch already applied: $(basename "$p")"
+  else
+    echo ">> Applying patch: $(basename "$p")"
+    git -C "$SRC" apply "$p"
+  fi
+done
+
 # --- Build ------------------------------------------------------------------
 echo "sdk.dir=$ANDROID_SDK_ROOT" > "$SRC/local.properties"
 echo ">> Building :app:assembleRelease (this can take several minutes)"

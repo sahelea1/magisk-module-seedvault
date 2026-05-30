@@ -36,6 +36,8 @@ device without rebuilding your ROM.
 | Pre-grant runtime perms (notifications, media location) | `system/etc/default-permissions/default-permissions_com.stevesoltys.seedvault.xml` |
 | Replace Google Backup with Seedvault | `service.sh` runs `bmgr transport com.stevesoltys.seedvault.transport.ConfigurableBackupTransport` at every boot |
 | Re-enable Google Backup on removal | `uninstall.sh` drops a one-shot script into `/data/adb/service.d` that restores the saved transport |
+| Keep scheduled backups alive | `<allow-in-power-save>` in the sysconfig allowlist + runtime `deviceidle whitelist` / background appops in `service.sh` |
+| Expose WebDAV on non-platform-signed installs | source patch `patches/0001-always-show-storage-chooser.patch` (see [Storage options](#storage-options-incl-webdav)) |
 
 The three permission/allowlist XML files and their install locations mirror
 Seedvault's own [`Android.bp`](https://github.com/seedvault-app/seedvault/blob/android16/Android.bp)
@@ -52,16 +54,38 @@ module directory so it survives module removal, letting `uninstall.sh` restore
 the exact transport you had before. If nothing was selected before, it defaults
 to the Google transport.
 
-### Signing note
+### Signing note (and why we patch the storage chooser)
 
 The bundled APK is signed with the **public AOSP platform test key** (the same
 key Seedvault's release build uses). On a stock device the platform signature
 won't match, so Seedvault is granted its permissions via the **privileged-app
 allowlist** rather than via a platform-signature match. All backup-transport
 functionality relies on `signature|privileged` permissions, which the allowlist
-covers — so app backup/restore works. A few purely cosmetic, signature-only
-extras (e.g. `MANAGE_DOCUMENTS` storage-root browsing) are optional and simply
-stay ungranted.
+covers — so app backup/restore works.
+
+The one user-visible casualty is `android.permission.MANAGE_DOCUMENTS`, a
+pure-`signature` permission that **cannot** be granted to a non-platform-signed
+app or via the privapp allowlist. Upstream Seedvault uses it only to decide
+whether to show the storage **type chooser**: with it, you get the chooser
+(WebDAV / USB / DavX5 / Nextcloud / …); without it, the app skips the chooser
+and drops you straight into a folder picker — which also hides WebDAV, even
+though WebDAV needs no SAF permission at all.
+
+To make WebDAV (and the other network options) reachable on stock firmware, we
+apply `patches/0001-always-show-storage-chooser.patch`, which makes Seedvault
+**always show the chooser**. Local/USB SAF roots still won't *enumerate* without
+`MANAGE_DOCUMENTS` (they just appear empty — the lookup is exception-safe and
+cannot crash), but **WebDAV works fully**, which is the appropriate off-device
+backend for a rooted stock phone anyway.
+
+### Battery optimization / background
+
+For scheduled automatic backups to survive, Seedvault must be exempt from Doze /
+battery optimization. The shipped sysconfig allowlist already adds it to the
+power-save whitelist (`allow-in-power-save`), and `service.sh` reinforces this at
+each boot (`dumpsys deviceidle whitelist +…`, `appops … RUN_ANY_IN_BACKGROUND
+allow`) to cope with aggressive OEM battery managers (e.g. Motorola). You can
+verify under **Settings → Apps → Seedvault → Battery → Unrestricted**.
 
 ---
 
@@ -81,19 +105,24 @@ stay ungranted.
 
 ### Storage options (incl. WebDAV)
 
-When you set up Seedvault, the storage picker offers:
+Tap **Sicherungsort / Backup location** in Seedvault (or *Settings → System →
+Backup → Backup location*). Thanks to the chooser patch (above), you get the
+storage **type chooser** rather than a bare folder picker:
 
-- **WebDAV** — back up to any WebDAV server (Nextcloud, ownCloud, mailbox.org,
-  a self-hosted server, etc.). Pick *WebDAV*, then enter the server **URL**,
-  **username** and **password**. This needs no extra setup from this module:
-  the bundled Seedvault build already ships the WebDAV backend, and the app
-  holds the `INTERNET` / `ACCESS_NETWORK_STATE` permissions it requires.
-- **USB flash drive** — removable storage; Seedvault backs up automatically when
-  it is plugged in.
-- **Internal storage / SD card** and other Storage Access Framework providers
-  (e.g. a DAVx5-mounted share) that expose a documents root.
+- **WebDAV** *(recommended on stock firmware)* — back up to any WebDAV server
+  (Nextcloud, ownCloud, mailbox.org, a self-hosted server, etc.). Pick *WebDAV*,
+  then enter the server **URL**, **username** and **password**. No SAF permission
+  is needed, so this works regardless of platform signing.
+- **DavX5 / Nextcloud** — entries to install/configure those apps as SAF
+  document providers.
+- **USB flash drive / internal / SD card** — Storage Access Framework roots.
+  These only *enumerate* when Seedvault holds `MANAGE_DOCUMENTS`, i.e. on a
+  platform-signed build; on stock firmware they appear empty. (Local/internal
+  storage is discouraged for backups anyway — Android refuses most internal
+  folders "for the protection of your data".)
 
-WebDAV is the recommended option for off-device, network backups.
+WebDAV is the recommended option for off-device, network backups on a rooted
+stock device.
 
 ### Uninstall
 
@@ -152,11 +181,13 @@ mocked Android tools:
   XML well-formedness, shell-script syntax, and (when present) the bundled APK's
   package name and signature.
 - **`tests/test_scripts.sh`** — functional checks: it mocks `bmgr`, `pm`,
-  `getprop` and `log`, then drives `service.sh` and `uninstall.sh` end-to-end to
-  prove that (1) the transport switches to Seedvault, (2) the previous transport
-  is saved and not clobbered on re-run, (3) uninstall drops a restore script
-  targeting the saved transport, and (4) that restore script re-enables Google
-  Backup and cleans up after itself.
+  `getprop`, `log`, `dumpsys` and `cmd`, then drives `service.sh` and
+  `uninstall.sh` end-to-end to prove that (1) the transport switches to
+  Seedvault, (1b) Seedvault is whitelisted from battery optimization and allowed
+  to run in the background, (2) the previous transport is saved and not clobbered
+  on re-run, (3) uninstall drops a restore script targeting the saved transport,
+  and (4) that restore script re-enables Google Backup and cleans up after
+  itself.
 
 ---
 
@@ -172,8 +203,10 @@ module/                         # contents of the flashable zip
 └── system/
     ├── priv-app/Seedvault/Seedvault.apk
     └── etc/{permissions,sysconfig,default-permissions}/*.xml
+patches/
+└── 0001-always-show-storage-chooser.patch  # applied to Seedvault at build time
 scripts/
-├── build.sh                    # build APK from Seedvault source
+├── build.sh                    # clone + patch + build APK from Seedvault source
 └── package.sh                  # zip the module
 tests/
 ├── validate.sh                 # static checks

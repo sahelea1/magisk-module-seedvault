@@ -1,0 +1,26 @@
+diff --git a/app/src/main/java/com/stevesoltys/seedvault/ui/storage/StorageActivity.kt b/app/src/main/java/com/stevesoltys/seedvault/ui/storage/StorageActivity.kt
+index b7052a4..740eb22 100644
+--- a/app/src/main/java/com/stevesoltys/seedvault/ui/storage/StorageActivity.kt
++++ b/app/src/main/java/com/stevesoltys/seedvault/ui/storage/StorageActivity.kt
+@@ -77,11 +77,16 @@ class StorageActivity : BackupActivity() {
+         }
+ 
+         if (savedInstanceState == null) {
+-            if (canUseStorageRootsFragment()) {
+-                showFragment(StorageOptionsFragment.newInstance(isRestore()))
+-            } else {
+-                openDocumentTree.launch(null)
+-            }
++            // magisk-module-seedvault patch: always show the storage type chooser.
++            // Upstream only shows it when holding MANAGE_DOCUMENTS (a signature
++            // permission only granted to platform-signed builds) and otherwise
++            // jumps straight to the SAF folder picker. On a non-platform-signed
++            // install (e.g. this Magisk module on stock firmware) that hides
++            // WebDAV, which does not need MANAGE_DOCUMENTS. Root enumeration is
++            // exception-safe (StorageRootResolver.getStorageRoots), so showing the
++            // chooser without the permission is safe: WebDAV and the install/setup
++            // placeholders appear; local/USB SAF roots simply stay empty.
++            showFragment(StorageOptionsFragment.newInstance(isRestore()))
+         }
+     }
+ 

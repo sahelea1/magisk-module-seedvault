@@ -41,6 +41,14 @@ if ! pm list packages 2>/dev/null | grep -q "package:$SEEDVAULT_PKG"; then
   exit 0
 fi
 
+# 2b) Keep Seedvault alive in the background: exempt it from battery
+#     optimization / Doze so scheduled backups are not killed. The shipped
+#     sysconfig allowlist already adds it to the power-save whitelist; we
+#     reinforce that at runtime here for OEM battery managers (e.g. Motorola).
+dumpsys deviceidle whitelist +"$SEEDVAULT_PKG" >/dev/null 2>&1
+cmd appops set "$SEEDVAULT_PKG" RUN_ANY_IN_BACKGROUND allow >/dev/null 2>&1
+cmd appops set "$SEEDVAULT_PKG" RUN_IN_BACKGROUND allow >/dev/null 2>&1
+
 # 3) Remember the transport that was active BEFORE we switch, exactly once,
 #    so removing the module can restore it.
 if [ ! -f "$PREV_FILE" ]; then

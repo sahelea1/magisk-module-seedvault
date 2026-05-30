@@ -51,6 +51,22 @@ if [ "$1" = "list" ] && [ "$2" = "packages" ]; then
 fi
 EOF
 
+export DEVIDLE_LOG="$SANDBOX/deviceidle_whitelist"
+export APPOPS_LOG="$SANDBOX/appops_calls"
+cat > "$BIN/dumpsys" <<'EOF'
+#!/usr/bin/env bash
+# record: dumpsys deviceidle whitelist +<pkg>
+if [ "$1" = "deviceidle" ] && [ "$2" = "whitelist" ]; then
+  echo "$3" >> "${DEVIDLE_LOG:?}"
+fi
+EOF
+
+cat > "$BIN/cmd" <<'EOF'
+#!/usr/bin/env bash
+# record appops invocations: cmd appops set <pkg> <op> <mode>
+if [ "$1" = "appops" ]; then shift; echo "$*" >> "${APPOPS_LOG:?}"; fi
+EOF
+
 cat > "$BIN/bmgr" <<'EOF'
 #!/usr/bin/env bash
 STATE="${BMGR_STATE:?}"
@@ -81,6 +97,10 @@ echo "== 1. service.sh switches the active transport to Seedvault =="
 bash "$SANDBOX/scripts/service.sh"
 check "active transport is now Seedvault" '[ "$(cat "$BMGR_STATE")" = "$SEEDVAULT_TRANSPORT" ]'
 check "previous transport saved as Google" '[ "$(cat "$STATE_DIR/previous_transport" 2>/dev/null)" = "$GOOGLE_TRANSPORT" ]'
+
+echo "== 1b. service.sh exempts Seedvault from battery optimization =="
+check "added to deviceidle (battery optimization) whitelist" 'grep -q "+com.stevesoltys.seedvault" "$SANDBOX/deviceidle_whitelist"'
+check "allowed to run in background (appops)" 'grep -q "com.stevesoltys.seedvault RUN_ANY_IN_BACKGROUND allow" "$SANDBOX/appops_calls"'
 
 echo "== 2. re-running service.sh is idempotent (keeps saved previous) =="
 bash "$SANDBOX/scripts/service.sh"
